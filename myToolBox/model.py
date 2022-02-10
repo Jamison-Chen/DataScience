@@ -45,7 +45,7 @@ class GenerativeModel(Model):
         self.__naiveBayes = naive_bayes
 
     def fit(self, x, y):
-        n = x.shape[0]
+        n, m = x.shape
         uniqueVals, counts = np.unique(y, return_counts=True)
         for i, classIdx in enumerate(uniqueVals):
             groupSamples = x[np.where(y.squeeze() == classIdx)[0], :]
@@ -56,6 +56,7 @@ class GenerativeModel(Model):
                 self.__cov[classIdx] *= np.eye(2)
             self.__p[classIdx] = counts[i] / n
         if self.__shareCov:
+            self.__meanCov = np.zeros((m, m))
             for classIdx in self.__cov:
                 self.__meanCov += self.__p[classIdx] * self.__cov[classIdx]
 
@@ -64,17 +65,24 @@ class GenerativeModel(Model):
         pMax = np.zeros((n, 1))
         prediction = np.empty((n, 1), dtype=np.int8)
         for classIdx in self.__mu:
-            if self.__shareCov:
-                # Assume Normal Distribution
-                pXGivenClass = multivariate_normal.pdf(
-                    x, mean=self.__mu[classIdx], cov=self.__meanCov
-                )
-            else:
-                # Assume Normal Distribution
-                pXGivenClass = multivariate_normal.pdf(
-                    x, mean=self.__mu[classIdx], cov=self.__cov[classIdx]
-                )
+            # Assume Normal Distribution
+            pXGivenClass = multivariate_normal.pdf(
+                x,
+                mean=self.__mu[classIdx],
+                cov=self.__meanCov if self.__shareCov else self.__cov[classIdx],
+            )
             p = (self.__p[classIdx] * pXGivenClass).reshape(n, 1)
             prediction = np.where(p > pMax, classIdx, prediction)
             pMax = np.maximum(p, pMax)
         return prediction
+
+
+class LogisticRegression(Model):
+    def __init__(self):
+        pass
+
+    def fit(self, x, y):
+        return super().fit(x, y)
+
+    def predict(self, x):
+        return super().predict(x)
