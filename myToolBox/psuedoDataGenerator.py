@@ -9,9 +9,11 @@ def independent_groups(size=300, group=3, deviation=16, plot=True):
     y = np.empty((0, 1), dtype=np.int8)
     plt.axis("equal")
     for i, each in enumerate(m):
-        cov = np.random.uniform(deviation / 10, deviation / 7, (2, 2)) ** 2
-        np.fill_diagonal(cov, np.random.uniform(-0.5, 0.5))
+        std = np.random.uniform(deviation / 10, deviation / 7, (2,))
+        cov = np.empty((2, 2), dtype=np.float64)
+        np.fill_diagonal(cov, np.random.uniform(-0.5, 0.5) * np.prod(std))
         cov = np.fliplr(cov)
+        cov[0][0], cov[1][1] = std[0] ** 2, std[1] ** 2
         group = np.random.multivariate_normal(each, cov, groupSize)
         x = np.concatenate((x, group), axis=0)
         y = np.concatenate((y, np.full(shape=(groupSize, 1), fill_value=i + 1)), axis=0)
