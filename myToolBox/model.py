@@ -1,6 +1,7 @@
 import abc
 import numpy as np
 from scipy.stats import multivariate_normal
+from copy import deepcopy
 
 
 class Model(metaclass=abc.ABCMeta):
@@ -19,8 +20,8 @@ class KNN(Model):
         self.__y = None
 
     def fit(self, x, y):
-        self.__x = x
-        self.__y = y
+        self.__x = deepcopy(x)
+        self.__y = deepcopy(y)
 
     def predict(self, x):
         result = []
@@ -32,6 +33,7 @@ class KNN(Model):
                 np.squeeze(self.__y[indices, :]), return_counts=True
             )
             result.append(uniqueVal[counts.argmax()])
+        # Time Complexity: O(n*n*m)
         return np.array([result]).T
 
 
@@ -65,7 +67,7 @@ class GenerativeModel(Model):
         pMax = np.zeros((n, 1))
         prediction = np.empty((n, 1), dtype=np.int8)
         for classIdx in self.__mu:
-            # Assume Normal Distribution
+            # Assume Normal (Gaussian) Distribution
             pXGivenClass = multivariate_normal.pdf(
                 x,
                 mean=self.__mu[classIdx],
@@ -77,6 +79,7 @@ class GenerativeModel(Model):
         return prediction
 
 
+# TODO: Implement the model below.
 class LogisticRegression(Model):
     def __init__(self):
         pass

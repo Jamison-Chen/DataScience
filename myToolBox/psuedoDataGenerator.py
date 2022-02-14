@@ -10,8 +10,9 @@ def independent_groups(size=300, group=3, deviation=16, plot=True):
     plt.axis("equal")
     for i, each in enumerate(m):
         std = np.random.uniform(deviation / 10, deviation / 7, (2,))
+        corrCoeff = np.random.uniform(-0.5, 0.5)
         cov = np.empty((2, 2), dtype=np.float64)
-        np.fill_diagonal(cov, np.random.uniform(-0.5, 0.5) * np.prod(std))
+        np.fill_diagonal(cov, corrCoeff * np.prod(std))
         cov = np.fliplr(cov)
         cov[0][0], cov[1][1] = std[0] ** 2, std[1] ** 2
         group = np.random.multivariate_normal(each, cov, groupSize)
