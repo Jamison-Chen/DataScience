@@ -24,3 +24,7 @@ def plotDecisionBoundary(model, x_test, y_test):
     plt.gca().set_aspect("equal", adjustable="box")
     plt.contourf(xx, yy, zz.reshape(xx.shape), cmap=plt.cm.Spectral)
     plt.scatter(x_test[:, 0], x_test[:, 1], c=y_test, cmap=plt.cm.Spectral)
+
+
+def plotLoss(model):
+    plt.plot(range(1, model.numOfLoop + 1), model.loss)
