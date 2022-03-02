@@ -1,6 +1,4 @@
 import abc
-from asyncore import loop
-from matplotlib.pyplot import axis
 import numpy as np
 from scipy.stats import multivariate_normal
 from copy import deepcopy
@@ -29,7 +27,7 @@ class KNN(Model):
     def predict(self, x):
         result = []
         for each in x:
-            # Use "Euclidean Distance" (L2 distance)
+            # Use "Euclidean Distance"
             distances = np.linalg.norm(each - self.__x, axis=1)
             indices = np.argpartition(distances, self.__k)[: self.__k]
             uniqueVal, counts = np.unique(
@@ -135,26 +133,32 @@ class LogisticRegression(Model):
 
     def __softmax(self, x):
         e = np.exp(x @ self.__w + self.__b)
-        return e / np.sum(e, axis=1)[:, np.newaxis]
+        return e / (np.sum(e, axis=1)[:, np.newaxis])
 
     def __crossEntropy(self, y, y_pred):
         return np.sum(y * np.log(y_pred)) * -1
 
-    def fit(self, x, y):
-        uniqVals = np.unique(y)
-        self.__w = np.random.uniform(-1, 1, (x.shape[1], len(uniqVals)))
+    def fit(self, x_train, y_train):
+        uniqVals = np.unique(y_train)
+        self.__w = np.random.uniform(-1, 1, (x_train.shape[1], len(uniqVals)))
         self.__b = np.random.uniform(-1, 1, (len(uniqVals),))
         self.loss = []
-        localY = deepcopy(y)
+        y = deepcopy(y_train)
+
+        # Encode each class name to numerical numbers
         for i, each in enumerate(uniqVals):
-            localY[localY == each] = i
+            y[y == each] = i
             self.__classes[i] = each
-        localY = np.where(np.arange(len(uniqVals)) == localY, 1, 0)
+
+        # Transform the true answers into vectors
+        y = np.where(np.arange(len(uniqVals)) == y, 1, 0)
+
+        # Training
         for _ in range(self.numOfLoop):
-            y_pred = self.__softmax(x)
-            self.loss.append(self.__crossEntropy(localY, y_pred))
-            self.__w -= x.T @ (y_pred - localY) * self.__lr
-            self.__b -= np.sum((y_pred - localY), axis=0) * self.__lr
+            y_pred = self.__softmax(x_train)
+            self.loss.append(self.__crossEntropy(y, y_pred))
+            self.__w -= x_train.T @ (y_pred - y) * self.__lr
+            self.__b -= np.sum((y_pred - y), axis=0) * self.__lr
 
     def predict(self, x):
         y_pred = self.__softmax(x)
@@ -162,14 +166,67 @@ class LogisticRegression(Model):
         return np.array(ans)[: np.newaxis]
 
 
+class TwoLayerNN(Model):
+    def __init__(self, numOfNode, lr, numOfLoop):
+        self.__w1 = None
+        self.__w2 = None
+        self.__classes = {}
+        self.__numOfNode = numOfNode
+        self.__lr = lr
+        self.numOfLoop = numOfLoop
+        self.loss = []
+
+    def __softmax(self, x, w):
+        e = np.exp(x @ w)
+        return e / (np.sum(e, axis=1)[:, np.newaxis])
+
+    def __crossEntropy(self, y, y_pred):
+        return np.sum(y * np.log(y_pred)) * -1
+
+    def fit(self, x_train, y_train):
+        uniqVals = np.unique(y_train)
+        self.__w1 = np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode))
+        self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals)))
+        self.loss = []
+        y = deepcopy(y_train)
+
+        # Encode each class name to numerical numbers
+        for i, each in enumerate(uniqVals):
+            y[y == each] = i
+            self.__classes[i] = each
+
+        # Transform the true answers into vectors
+        y = np.where(np.arange(len(uniqVals)) == y, 1, 0)
+
+        # Training
+        for _ in range(self.numOfLoop):
+            h = self.__softmax(x_train, self.__w1)  # (n, k)
+            y_pred = self.__softmax(h, self.__w2)  # (n, c)
+            self.loss.append(self.__crossEntropy(y, y_pred))
+
+            w2_gradient = h.T @ (y_pred - y)  # (k, c)
+
+            h_gradient = (y_pred - y) @ self.__w2.T
+            w1_gradient = x_train.T @ (h * (1 - h) * h_gradient)  # (m, k)
+
+            self.__w2 -= w2_gradient * self.__lr  # (k, c)
+            self.__w1 -= w1_gradient * self.__lr  # (m, k)
+
+    def predict(self, x):
+        h = self.__softmax(x, self.__w1)  # (n, k)
+        y_pred = self.__softmax(h, self.__w2)  # (n, c)
+        ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
+        return np.array(ans)[: np.newaxis]
+
+
 if __name__ == "__main__":
-    x = np.random.rand(10, 2)
-    pre = np.random.rand(10, 1)
+    x = np.random.rand(12, 2)
+    pre = np.random.rand(12, 1)
     y = np.where(
         pre >= 2 / 3,
         2,
         np.where(pre >= 1 / 3, 1, 0),
     )
-    s = LogisticRegression()
-    s.fit(x, y)
-    print(s.predict(x))
+    tlnn = TwoLayerNN(10, 0.00001, 8000)
+    tlnn.fit(x, y)
+    tlnn.predict(x)
