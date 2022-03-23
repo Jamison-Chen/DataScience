@@ -72,7 +72,7 @@ class GenerativeModel(Model):
         prediction = np.empty((n, 1), dtype=np.int8)
         for c in self.__mu:
             # Assume Normal (Gaussian) Distribution
-            # Pxlc denotes P(x|c)
+            # `Pxlc` denotes P(x|c)
             Pxlc = multivariate_normal.pdf(
                 x,
                 mean=self.__mu[c],
@@ -112,6 +112,8 @@ class SimpleLogisticRegression(Model):
         for _ in range(self.numOfLoop):
             y_pred = self.__sigmoid(x @ self.__w + self.__b)
             self.loss.append(self.__crossEntropy(y_squeezed, y_pred))
+
+            # update w and b
             self.__w -= np.sum((y_pred - y_hat)[:, np.newaxis] * x, axis=0) * self.__lr
             self.__b -= np.sum((y_pred - y_hat)[:, np.newaxis], axis=0) * self.__lr
 
@@ -145,7 +147,7 @@ class LogisticRegression(Model):
         self.loss = []
         y = deepcopy(y_train)
 
-        # Encode each class name to numerical numbers
+        # Encode class names into numerical numbers
         for i, each in enumerate(uniqVals):
             y[y == each] = i
             self.__classes[i] = each
