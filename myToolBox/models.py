@@ -196,7 +196,7 @@ class LogisticRegression(Model):
         return np.array(ans)[: np.newaxis]
 
 
-class TL_FC_NN(Model):
+class TL_FC_NN_Classifier(Model):
     def __init__(self, hiddenLayerNodeNumber):
         self.__w1 = None
         self.__w2 = None
@@ -333,6 +333,6 @@ if __name__ == "__main__":
         2,
         np.where(pre >= 1 / 3, 1, 0),
     )
-    tlnn = TL_FC_NN(10, 0.00001, 8000)
+    tlnn = TL_FC_NN_Classifier(10, 0.00001, 8000)
     tlnn.fit(x, y)
     tlnn.predict(x)
