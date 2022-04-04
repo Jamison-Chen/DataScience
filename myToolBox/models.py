@@ -2,7 +2,14 @@ import abc
 import numpy as np
 from scipy.stats import multivariate_normal
 from copy import deepcopy
-from .my_math import sigmoid, softmax, MSE, crossEntropy
+from .functions import (
+    ActivationFunction,
+    LossFunction,
+    Sigmoid,
+    Softmax,
+    SquaredError,
+    CrossEntropy,
+)
 
 
 class Model(metaclass=abc.ABCMeta):
@@ -87,13 +94,14 @@ class GenerativeModel(Model):
 
 
 class DichotomousLogistic(Model):
-    def __init__(self, lr, numOfLoop):
+    def __init__(self, learningRate, numOfLoop):
         self.__w = None
         self.__b = 0
         self.__classes = []
-        self.__lr = lr
+        self.__lr = learningRate
         self.numOfLoop = numOfLoop
-        self.loss = []
+        self.sigmoid = Sigmoid()
+        self.lossHistory = []
 
     def __crossEntropy(self, y, y_pred):
         return -1 * np.sum(
@@ -104,41 +112,45 @@ class DichotomousLogistic(Model):
         self.__w = np.random.uniform(-1, 1, (x.shape[1],))
         self.__b = np.random.uniform(-1, 1)
         self.__classes = np.unique(y)
-        self.loss = []
+        self.lossHistory = []
         y_squeezed = deepcopy(y).squeeze()
         y_hat = np.where(y_squeezed == self.__classes[0], 1, 0)
 
         for _ in range(self.numOfLoop):
-            y_pred = sigmoid(x @ self.__w + self.__b)
+            y_pred = self.sigmoid.forward(x @ self.__w + self.__b)
 
             # Store loss (for ploting)
-            self.loss.append(self.__crossEntropy(y_squeezed, y_pred))
+            self.lossHistory.append(
+                self.__crossEntropy(y_squeezed, y_pred) / y_pred.shape[0]
+            )
 
             # update w and b using gradient descent
             self.__w -= np.sum((y_pred - y_hat)[:, np.newaxis] * x, axis=0) * self.__lr
             self.__b -= np.sum((y_pred - y_hat)[:, np.newaxis], axis=0) * self.__lr
 
     def predict(self, x):
-        y_pred = sigmoid(x @ self.__w + self.__b)
+        y_pred = self.sigmoid.forward(x @ self.__w + self.__b)
         return np.where(y_pred >= 0.5, self.__classes[0], self.__classes[1])[
             :, np.newaxis
         ]
 
 
 class LogisticRegression(Model):
-    def __init__(self, lr=0.005, numOfLoop=200):
+    def __init__(self, learningRate=0.005, numOfLoop=200):
         self.__w = None
         self.__b = None
         self.__classes = {}
-        self.__lr = lr
+        self.__lr = learningRate
         self.numOfLoop = numOfLoop
-        self.loss = []
+        self.softmax = Softmax()
+        self.crossEntropy = CrossEntropy()
+        self.lossHistory = []
 
     def fit(self, x_train, y_train):
         uniqVals = np.unique(y_train)
         self.__w = np.random.uniform(-1, 1, (x_train.shape[1], len(uniqVals)))
         self.__b = np.random.uniform(-1, 1, (len(uniqVals),))
-        self.loss = []
+        self.lossHistory = []
         y = deepcopy(y_train)
 
         # Encode class names into numerical numbers
@@ -151,17 +163,31 @@ class LogisticRegression(Model):
 
         # Training
         for _ in range(self.numOfLoop):
-            y_pred = softmax(x_train @ self.__w + self.__b)
+            y_pred = self.softmax.forward(x_train @ self.__w + self.__b)
 
             # Store loss (for ploting)
-            self.loss.append(crossEntropy(y, y_pred))
+            self.lossHistory.append(
+                self.crossEntropy.forward(y, y_pred) / y_pred.shape[0]
+            )
 
-            # update w and b using gradient descent
-            self.__w -= x_train.T @ (y_pred - y) * self.__lr
-            self.__b -= np.sum((y_pred - y), axis=0) * self.__lr
+            # Directly derive the final gradient after partial differential
+            # w_gradient = x_train.T @ (y_pred - y)
+            # b_gradient = np.sum((y_pred - y), axis=0)
+
+            # Chain the backpropagations to derive the gradient
+            w_gradient = x_train.T @ (
+                self.softmax.backward() * self.crossEntropy.backward()
+            )
+            b_gradient = np.sum(
+                (self.softmax.backward() * self.crossEntropy.backward()), axis=0
+            )
+
+            # Update w and b using gradient descent
+            self.__w -= w_gradient * self.__lr
+            self.__b -= b_gradient * self.__lr
 
     def predict(self, x):
-        y_pred = softmax(x @ self.__w + self.__b)
+        y_pred = self.softmax.forward(x @ self.__w + self.__b)
 
         # Decode numerical numbers to class names
         ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
@@ -169,21 +195,58 @@ class LogisticRegression(Model):
         return np.array(ans)[: np.newaxis]
 
 
-class TwoLayerNN(Model):
-    def __init__(self, numOfNode, lr, numOfLoop):
+class TL_FC_NN(Model):
+    def __init__(self, hiddenLayerNodeNumber, learningRate, numOfLoop):
         self.__w1 = None
         self.__w2 = None
         self.__classes = {}
-        self.__numOfNode = numOfNode
-        self.__lr = lr
+        self.__numOfNode = hiddenLayerNodeNumber
+        self.__lr = learningRate
         self.numOfLoop = numOfLoop
-        self.loss = []
+        self.lossHistory = []
+
+        # `h` denotes the activation function of the hidden layer
+        # defaults to sigmoid
+        self.__h = Sigmoid()
+
+        # `l` denotes the loss function
+        # defaults to square error
+        self.__l = SquaredError()
+
+        # softmax for cross entropy loss (if was choosen)
+        self.softmax = Softmax()
+
+    @property
+    def activation_function(self):
+        return self.__h
+
+    @activation_function.setter
+    def activation_function(self, f):
+        if isinstance(f, ActivationFunction):
+            self.__h = f
+        else:
+            raise Exception(
+                "Please provide an activation function instead of {}".format(type(f))
+            )
+
+    @property
+    def loss_function(self):
+        return self.__l
+
+    @loss_function.setter
+    def loss_function(self, l):
+        if isinstance(l, LossFunction):
+            self.__l = l
+        else:
+            raise Exception(
+                "Please provide an activation function instead of {}".format(type(l))
+            )
 
     def fit(self, x_train, y_train):
         uniqVals = np.unique(y_train)
         self.__w1 = np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode))
         self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals)))
-        self.loss = []
+        self.lossHistory = []
         y = deepcopy(y_train)
 
         # Encode each class name to numerical numbers
@@ -196,24 +259,33 @@ class TwoLayerNN(Model):
 
         # Training
         for _ in range(self.numOfLoop):
-            h = sigmoid(x_train @ self.__w1)  # (n, k)
-            # y_pred = softmax(h @ self.__w2)  # (n, c)
-            y_pred = h @ self.__w2  # (n, c)
+            # Forward
+            h = self.__h.forward(x_train @ self.__w1)  # (n, k)
+            if isinstance(self.__l, CrossEntropy):
+                y_pred = self.softmax.forward(h @ self.__w2)  # (n, c)
+            else:
+                y_pred = h @ self.__w2  # (n, c)
 
             # Store loss (for ploting)
-            # self.loss.append(crossEntropy(y, y_pred))
-            self.loss.append(MSE(y, y_pred))
+            self.lossHistory.append(self.__l.forward(y, y_pred) / y_pred.shape[0])
 
-            w2_gradient = h.T @ (y_pred - y)  # (k, c)
-            h_gradient = (y_pred - y) @ self.__w2.T  # (n, k)
-            w1_gradient = x_train.T @ (h * (1 - h) * h_gradient)  # (m, k)
-
+            # Backward
+            if isinstance(self.__l, CrossEntropy):
+                w2_gradient = h.T @ (self.softmax.backward() * self.__l.backward())
+            else:
+                w2_gradient = h.T @ self.__l.backward()  # (k, c)
+            w1_gradient = x_train.T @ (
+                self.__h.backward() * (self.__l.backward() @ self.__w2.T)
+            )  # (m, k)
             self.__w2 -= w2_gradient * self.__lr  # (k, c)
             self.__w1 -= w1_gradient * self.__lr  # (m, k)
 
     def predict(self, x):
-        h = sigmoid(x @ self.__w1)  # (n, k)
-        y_pred = h @ self.__w2  # (n, c)
+        h = self.__h.forward(x @ self.__w1)  # (n, k)
+        if isinstance(self.__l, CrossEntropy):
+            y_pred = self.softmax.forward(h @ self.__w2)  # (n, c)
+        else:
+            y_pred = h @ self.__w2  # (n, c)
         ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
         return np.array(ans)[: np.newaxis]
 
@@ -226,6 +298,6 @@ if __name__ == "__main__":
         2,
         np.where(pre >= 1 / 3, 1, 0),
     )
-    tlnn = TwoLayerNN(10, 0.00001, 8000)
+    tlnn = TL_FC_NN(10, 0.00001, 8000)
     tlnn.fit(x, y)
     tlnn.predict(x)

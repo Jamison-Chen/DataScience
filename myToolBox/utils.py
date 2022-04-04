@@ -27,4 +27,4 @@ def plotDecisionBoundary(model, x_test, y_test):
 
 
 def plotLoss(model):
-    plt.plot(range(1, model.numOfLoop + 1), model.loss)
+    plt.plot(range(1, model.numOfLoop + 1), model.lossHistory)

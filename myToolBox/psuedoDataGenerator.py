@@ -18,6 +18,6 @@ def independent_groups(size=300, group=3, deviation=16, plot=True):
         group = np.random.multivariate_normal(each, cov, groupSize)
         x = np.concatenate((x, group), axis=0)
         y = np.concatenate((y, np.full(shape=(groupSize, 1), fill_value=i + 1)), axis=0)
-        if plot:
-            plt.scatter(group[:, 0], group[:, 1])
+    if plot:
+        plt.scatter(x[:, 0], x[:, 1], c=y, cmap=plt.cm.Spectral)
     return x, y
