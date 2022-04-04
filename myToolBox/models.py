@@ -200,6 +200,8 @@ class TL_FC_NN(Model):
     def __init__(self, hiddenLayerNodeNumber):
         self.__w1 = None
         self.__w2 = None
+        self.__b1 = None
+        self.__b2 = None
         self.__classes = {}
         self.__numOfNode = hiddenLayerNodeNumber
         self.epoch = None
@@ -247,10 +249,12 @@ class TL_FC_NN(Model):
         if not batch_size:
             batch_size = x_train.shape[0]
 
-        # Initialize weights
+        # Initialize weights and bias
         uniqVals = np.unique(y_train)
         self.__w1 = np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode))
         self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals)))
+        self.__b1 = np.random.uniform(-1, 1, (self.__numOfNode,))
+        self.__b2 = np.random.uniform(-1, 1, (len(uniqVals),))
         self.lossHistory = []
         self.epoch = epoch
         x = deepcopy(x_train)
@@ -278,11 +282,11 @@ class TL_FC_NN(Model):
             batchLoss = 0
             for batch in batches:
                 # Forward
-                h = self.__h.forward(batch["x"] @ self.__w1)  # (n, k)
+                h = self.__h.forward(batch["x"] @ self.__w1 + self.__b1)  # (n, k)
                 if isinstance(self.__l, CrossEntropy):
-                    y_pred = self.softmax.forward(h @ self.__w2)  # (n, c)
+                    y_pred = self.softmax.forward(h @ self.__w2 + self.__b2)  # (n, c)
                 else:
-                    y_pred = h @ self.__w2  # (n, c)
+                    y_pred = h @ self.__w2 + self.__b2  # (n, c)
 
                 # Accumulate batch loss
                 batchLoss += self.__l.forward(batch["y"], y_pred) / y_pred.shape[0]
@@ -290,24 +294,33 @@ class TL_FC_NN(Model):
                 # Backward
                 if isinstance(self.__l, CrossEntropy):
                     w2_gradient = h.T @ (self.softmax.backward() * self.__l.backward())
+                    b2_gradient = np.sum(
+                        self.softmax.backward() * self.__l.backward(), axis=0
+                    )
                 else:
                     w2_gradient = h.T @ self.__l.backward()  # (k, c)
+                    b2_gradient = np.sum(self.__l.backward(), axis=0)
 
                 w1_gradient = batch["x"].T @ (
                     self.__h.backward() * (self.__l.backward() @ self.__w2.T)
                 )  # (m, k)
+                b1_gradient = np.sum(
+                    self.__h.backward() * (self.__l.backward() @ self.__w2.T), axis=0
+                )
 
                 self.__w2 -= w2_gradient * lr  # (k, c)
                 self.__w1 -= w1_gradient * lr  # (m, k)
+                self.__b2 -= b2_gradient * lr
+                self.__b1 -= b1_gradient * lr
             # Store loss (for ploting)
             self.lossHistory.append(batchLoss)
 
     def predict(self, x):
-        h = self.__h.forward(x @ self.__w1)  # (n, k)
+        h = self.__h.forward(x @ self.__w1 + self.__b1)  # (n, k)
         if isinstance(self.__l, CrossEntropy):
-            y_pred = self.softmax.forward(h @ self.__w2)  # (n, c)
+            y_pred = self.softmax.forward(h @ self.__w2 + self.__b2)  # (n, c)
         else:
-            y_pred = h @ self.__w2  # (n, c)
+            y_pred = h @ self.__w2 + self.__b2  # (n, c)
         ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
         return np.array(ans)[: np.newaxis]
 
