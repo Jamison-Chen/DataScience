@@ -67,7 +67,7 @@ class GenerativeModel(Model):
             self.__cov[classIdx] = np.cov(groupSamples.T)
             if self.__naiveBayes:
                 # Assume covariance between different features to be 0.
-                self.__cov[classIdx] *= np.eye(2)
+                self.__cov[classIdx] *= np.eye(m)
             self.__p[classIdx] = counts[i] / n
         if self.__shareCov:
             self.__meanCov = np.zeros((m, m))
@@ -148,8 +148,8 @@ class LogisticRegression(Model):
 
     def fit(self, x_train, y_train, lr=0.005, epoch=200):
         uniqVals = np.unique(y_train)
-        self.__w = np.random.uniform(-1, 1, (x_train.shape[1], len(uniqVals)))
-        self.__b = np.random.uniform(-1, 1, (len(uniqVals),))
+        self.__w = np.random.uniform(-1, 1, (x_train.shape[1], len(uniqVals))) / 1000
+        self.__b = np.random.uniform(-1, 1, (len(uniqVals),)) / 1000
         self.lossHistory = []
         self.epoch = epoch
         y = deepcopy(y_train)
@@ -251,10 +251,12 @@ class TL_FC_NN_Classifier(Model):
 
         # Initialize weights and bias
         uniqVals = np.unique(y_train)
-        self.__w1 = np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode))
-        self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals)))
-        self.__b1 = np.random.uniform(-1, 1, (self.__numOfNode,))
-        self.__b2 = np.random.uniform(-1, 1, (len(uniqVals),))
+        self.__w1 = (
+            np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode)) / 1000
+        )
+        self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals))) / 1000
+        self.__b1 = np.random.uniform(-1, 1, (self.__numOfNode,)) / 1000
+        self.__b2 = np.random.uniform(-1, 1, (len(uniqVals),)) / 1000
         self.lossHistory = []
         self.epoch = epoch
         x = deepcopy(x_train)
