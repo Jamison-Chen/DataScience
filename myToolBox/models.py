@@ -140,7 +140,6 @@ class LogisticRegression(Model):
     def __init__(self):
         self.__w = None
         self.__b = None
-        self.__classes = {}
         self.softmax = Softmax()
         self.crossEntropy = CrossEntropy()
         self.epoch = None
@@ -153,11 +152,6 @@ class LogisticRegression(Model):
         self.lossHistory = []
         self.epoch = epoch
         y = deepcopy(y_train)
-
-        # Encode class names into numerical numbers
-        for i, each in enumerate(uniqVals):
-            y[y == each] = i
-            self.__classes[i] = each
 
         # Transform the true answers into vectors
         y = np.where(np.arange(len(uniqVals)) == y, 1, 0)
@@ -189,21 +183,17 @@ class LogisticRegression(Model):
 
     def predict(self, x):
         y_pred = self.softmax.forward(x @ self.__w + self.__b)
-
-        # Decode numerical numbers to class names
-        ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
-
+        ans = np.argmax(y_pred, axis=1)
         return np.array(ans)[: np.newaxis]
 
 
 class TL_FC_NN_Classifier(Model):
-    def __init__(self, hiddenLayerNodeNumber):
+    def __init__(self):
         self.__w1 = None
         self.__w2 = None
         self.__b1 = None
         self.__b2 = None
-        self.__classes = {}
-        self.__numOfNode = hiddenLayerNodeNumber
+        self.__numOfNode = None
         self.epoch = None
         self.lossHistory = []
 
@@ -244,28 +234,28 @@ class TL_FC_NN_Classifier(Model):
                 "Please provide an activation function instead of {}".format(type(l))
             )
 
+    def define(self, mFeatures, kNodes, cClasses):
+        if kNodes == None:
+            raise Exception("Please define the model before fitting.")
+        self.__numOfNode = kNodes
+        self.__w1 = np.random.uniform(-1, 1, (mFeatures, kNodes)) / 1000
+        self.__w2 = np.random.uniform(-1, 1, (kNodes, cClasses)) / 1000
+        self.__b1 = np.random.uniform(-1, 1, (kNodes,)) / 1000
+        self.__b2 = np.random.uniform(-1, 1, (cClasses,)) / 1000
+
     def fit(self, x_train, y_train, lr, batch_size=None, epoch=1000):
         # `batch_size` defaults to full-batch
         if not batch_size:
             batch_size = x_train.shape[0]
-
-        # Initialize weights and bias
-        uniqVals = np.unique(y_train)
-        self.__w1 = (
-            np.random.uniform(-1, 1, (x_train.shape[1], self.__numOfNode)) / 1000
-        )
-        self.__w2 = np.random.uniform(-1, 1, (self.__numOfNode, len(uniqVals))) / 1000
-        self.__b1 = np.random.uniform(-1, 1, (self.__numOfNode,)) / 1000
-        self.__b2 = np.random.uniform(-1, 1, (len(uniqVals),)) / 1000
         self.lossHistory = []
         self.epoch = epoch
         x = deepcopy(x_train)
         y = deepcopy(y_train)
 
-        # Encode each class name to numerical numbers
-        for i, each in enumerate(uniqVals):
-            y[y == each] = i
-            self.__classes[i] = each
+        # Re-initialize weights and bias
+        # (cClasses might be differ from what user's defined)
+        uniqVals = np.unique(y)
+        self.define(x.shape[1], self.__numOfNode, len(uniqVals))
 
         # Transform the true answers into vectors
         y = np.where(np.arange(len(uniqVals)) == y, 1, 0)
@@ -323,8 +313,17 @@ class TL_FC_NN_Classifier(Model):
             y_pred = self.softmax.forward(h @ self.__w2 + self.__b2)  # (n, c)
         else:
             y_pred = h @ self.__w2 + self.__b2  # (n, c)
-        ans = [self.__classes[each] for each in np.argmax(y_pred, axis=1)]
+        ans = np.argmax(y_pred, axis=1)
         return np.array(ans)[: np.newaxis]
+
+    def save(self, fileName):
+        np.savez(fileName, w1=self.__w1, w2=self.__w2, b1=self.__b1, b2=self.__b2)
+
+    def load(self, file):
+        self.__w1 = file["w1"]
+        self.__w2 = file["w2"]
+        self.__b1 = file["b1"]
+        self.__b2 = file["b2"]
 
 
 if __name__ == "__main__":

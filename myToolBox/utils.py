@@ -28,3 +28,18 @@ def plotDecisionBoundary(model, x_test, y_test):
 
 def plotLoss(model):
     plt.plot(range(1, model.epoch + 1), model.lossHistory)
+
+
+def encodeLabel(y):
+    if type(y) == list:
+        y = np.array(y)
+
+    # `decode_map` is used to translate models prediction
+    # to their corresponding class (category) name
+    decode_map = {}
+    encoded = np.full(y.shape, -1, dtype=np.int32)
+    uniqVals = np.unique(y)
+    for i, each in enumerate(uniqVals):
+        encoded = np.where(y == each, i, encoded)
+        decode_map[i] = each
+    return encoded, decode_map
