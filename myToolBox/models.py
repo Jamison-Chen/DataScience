@@ -310,8 +310,8 @@ class TL_FC_NN_Classifier(Model):
 
                 self.__w2 -= w2_gradient * lr  # (k, c)
                 self.__w1 -= w1_gradient * lr  # (m, k)
-                self.__b2 -= b2_gradient * lr
-                self.__b1 -= b1_gradient * lr
+                self.__b2 -= b2_gradient * lr  # (c,)
+                self.__b1 -= b1_gradient * lr  # (k,)
             # Store loss (for ploting)
             self.lossHistory.append(batchLoss)
 

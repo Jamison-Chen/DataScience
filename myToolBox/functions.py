@@ -74,6 +74,9 @@ class ReLU(ActivationFunction):
         return np.where(self.forwardInput <= 0, 0, 1)
 
 
+# class Maxout(ActivationFunction):
+
+
 class CrossEntropy(LossFunction):
     def __init__(self):
         super().__init__()
