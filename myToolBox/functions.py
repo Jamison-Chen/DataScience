@@ -88,7 +88,9 @@ class CrossEntropy(LossFunction):
         return self.forwardOutput
 
     def backward(self):
-        return ((1 - self.y) / (1 - self.y_pred)) - (self.y / self.y_pred)
+        return ((1 - self.y) / (1 + 1e-12 - self.y_pred)) - (
+            self.y / (self.y_pred + 1e-12)
+        )
 
 
 class SquaredError(LossFunction):
